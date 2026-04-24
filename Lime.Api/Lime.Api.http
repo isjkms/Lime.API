@@ -1,0 +1,6 @@
+@Lime.Api_HostAddress = http://localhost:5103
+
+GET {{Lime.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
