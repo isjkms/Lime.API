@@ -8,5 +8,5 @@ public interface ISessionService
 {
     Task<IssuedTokens> IssueAsync(User user, CancellationToken ct);
     Task<IssuedTokens?> RotateAsync(string refreshToken, CancellationToken ct);
-    Task RevokeAsync(string refreshToken, CancellationToken ct);
+    Task<Guid?> RevokeAsync(string refreshToken, CancellationToken ct);
 }

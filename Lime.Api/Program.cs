@@ -41,6 +41,7 @@ builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<ISpotifyTokenProvider, SpotifyTokenProvider>();
 builder.Services.AddHttpClient<SpotifyClient>();
+builder.Services.AddScoped<ISpotifyUserTokenService, SpotifyUserTokenService>();
 
 // JWT auth — token read from cookie
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -103,5 +104,6 @@ app.MapGet("/health/db", async (AppDbContext db) =>
 
 app.MapAuthEndpoints();
 app.MapSpotifyEndpoints();
+app.MapSpotifyConnectEndpoints();
 
 app.Run();

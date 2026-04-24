@@ -61,13 +61,17 @@ public class SessionService : ISessionService
         return issued;
     }
 
-    public async Task RevokeAsync(string refreshToken, CancellationToken ct)
+    public async Task<Guid?> RevokeAsync(string refreshToken, CancellationToken ct)
     {
         var hash = Hash(refreshToken);
         var existing = await _db.RefreshTokens.FirstOrDefaultAsync(r => r.TokenHash == hash, ct);
-        if (existing is null || existing.RevokedAt is not null) return;
-        existing.RevokedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
+        if (existing is null) return null;
+        if (existing.RevokedAt is null)
+        {
+            existing.RevokedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync(ct);
+        }
+        return existing.UserId;
     }
 
     private string CreateAccessToken(User user, DateTime now, DateTime exp)

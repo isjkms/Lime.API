@@ -10,6 +10,7 @@ public class AppDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<UserOAuthAccount> UserOAuthAccounts => Set<UserOAuthAccount>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<UserSpotifyLink> UserSpotifyLinks => Set<UserSpotifyLink>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -77,6 +78,26 @@ public class AppDbContext : DbContext
             e.HasIndex(x => x.TokenHash).IsUnique().HasDatabaseName("ix_refresh_tokens_token_hash");
             e.HasIndex(x => x.UserId).HasDatabaseName("ix_refresh_tokens_user_id");
             e.HasIndex(x => x.ExpiresAt).HasDatabaseName("ix_refresh_tokens_expires_at");
+        });
+
+        mb.Entity<UserSpotifyLink>(e =>
+        {
+            e.ToTable("user_spotify_links");
+            e.HasKey(x => x.UserId);
+            e.Property(x => x.UserId).HasColumnName("user_id");
+            e.Property(x => x.SpotifyUserId).HasColumnName("spotify_user_id").HasMaxLength(128);
+            e.Property(x => x.RefreshToken).HasColumnName("refresh_token").IsRequired();
+            e.Property(x => x.AccessToken).HasColumnName("access_token");
+            e.Property(x => x.AccessExpiresAt).HasColumnName("access_expires_at");
+            e.Property(x => x.Scope).HasColumnName("scope");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
+
+            e.HasOne(x => x.User)
+                .WithOne()
+                .HasForeignKey<UserSpotifyLink>(x => x.UserId)
+                .HasConstraintName("fk_user_spotify_links_users_user_id")
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
