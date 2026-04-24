@@ -3,6 +3,7 @@ using Lime.Api.Data;
 using Lime.Api.Features.Auth;
 using Lime.Api.Features.Auth.Models;
 using Lime.Api.Features.Auth.Services;
+using Lime.Api.Features.Spotify;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -33,6 +34,13 @@ builder.Services.AddScoped<IOAuthProvider>(sp => sp.GetRequiredService<NaverOAut
 builder.Services.AddScoped<OAuthProviderRegistry>();
 builder.Services.AddScoped<IUserLinker, UserLinker>();
 builder.Services.AddScoped<ISessionService, SessionService>();
+
+// Spotify integration
+builder.Services.Configure<SpotifyOptions>(builder.Configuration.GetSection(SpotifyOptions.SectionName));
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<ISpotifyTokenProvider, SpotifyTokenProvider>();
+builder.Services.AddHttpClient<SpotifyClient>();
 
 // JWT auth — token read from cookie
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -94,5 +102,6 @@ app.MapGet("/health/db", async (AppDbContext db) =>
 });
 
 app.MapAuthEndpoints();
+app.MapSpotifyEndpoints();
 
 app.Run();
