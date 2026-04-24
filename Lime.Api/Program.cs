@@ -1,41 +1,98 @@
+using System.Text;
+using Lime.Api.Data;
+using Lime.Api.Features.Auth;
+using Lime.Api.Features.Auth.Models;
+using Lime.Api.Features.Auth.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+// Configure database options
+var dbOptions = builder.Configuration
+    .GetSection(DatabaseOptions.SectionName)
+    .Get<DatabaseOptions>() ?? new DatabaseOptions();
+
+builder.Services.AddDbContext<AppDbContext>(opt =>
+    opt.UseNpgsql(dbOptions.BuildConnectionString()));
+
+// Auth options
+builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
+var authOptions = builder.Configuration.GetSection(AuthOptions.SectionName).Get<AuthOptions>() ?? new AuthOptions();
+
+// OAuth providers
+builder.Services.AddHttpClient<GoogleOAuthProvider>();
+builder.Services.AddHttpClient<KakaoOAuthProvider>();
+builder.Services.AddHttpClient<NaverOAuthProvider>();
+builder.Services.AddScoped<IOAuthProvider>(sp => sp.GetRequiredService<GoogleOAuthProvider>());
+builder.Services.AddScoped<IOAuthProvider>(sp => sp.GetRequiredService<KakaoOAuthProvider>());
+builder.Services.AddScoped<IOAuthProvider>(sp => sp.GetRequiredService<NaverOAuthProvider>());
+builder.Services.AddScoped<OAuthProviderRegistry>();
+builder.Services.AddScoped<IUserLinker, UserLinker>();
+builder.Services.AddScoped<ISessionService, SessionService>();
+
+// JWT auth — token read from cookie
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(o =>
+    {
+        o.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = authOptions.Jwt.Issuer,
+            ValidAudience = authOptions.Jwt.Audience,
+            IssuerSigningKey = string.IsNullOrEmpty(authOptions.Jwt.SigningKey)
+                ? new SymmetricSecurityKey(Encoding.UTF8.GetBytes(new string('0', 32)))
+                : new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authOptions.Jwt.SigningKey)),
+        };
+        o.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = ctx =>
+            {
+                if (ctx.Request.Cookies.TryGetValue(authOptions.Cookie.AccessName, out var token))
+                    ctx.Token = token;
+                return Task.CompletedTask;
+            },
+        };
+    });
+builder.Services.AddAuthorization();
+
+// CORS for Web
+builder.Services.AddCors(o =>
+{
+    o.AddDefaultPolicy(p =>
+    {
+        if (!string.IsNullOrWhiteSpace(authOptions.WebBaseUrl))
+            p.WithOrigins(authOptions.WebBaseUrl.TrimEnd('/'));
+        p.AllowCredentials().AllowAnyHeader().AllowAnyMethod();
+    });
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
-
-app.UseHttpsRedirection();
-
-var summaries = new[]
+else
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+    app.UseHttpsRedirection();
+}
+app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
 
-app.MapGet("/weatherforecast", () =>
+app.MapGet("/health/db", async (AppDbContext db) =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+    var canConnect = await db.Database.CanConnectAsync();
+    return Results.Ok(new { ok = canConnect });
+});
+
+app.MapAuthEndpoints();
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
