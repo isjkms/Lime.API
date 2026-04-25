@@ -11,6 +11,10 @@ public class AppDbContext : DbContext
     public DbSet<UserOAuthAccount> UserOAuthAccounts => Set<UserOAuthAccount>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<UserSpotifyLink> UserSpotifyLinks => Set<UserSpotifyLink>();
+    public DbSet<Album> Albums => Set<Album>();
+    public DbSet<Track> Tracks => Set<Track>();
+    public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<ReviewReaction> ReviewReactions => Set<ReviewReaction>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -98,6 +102,115 @@ public class AppDbContext : DbContext
                 .HasForeignKey<UserSpotifyLink>(x => x.UserId)
                 .HasConstraintName("fk_user_spotify_links_users_user_id")
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        mb.Entity<Album>(e =>
+        {
+            e.ToTable("albums");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.SpotifyId).HasColumnName("spotify_id").HasMaxLength(64).IsRequired();
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(512).IsRequired();
+            e.Property(x => x.CoverUrl).HasColumnName("cover_url");
+            e.Property(x => x.ReleaseDate).HasColumnName("release_date").HasMaxLength(16);
+            e.Property(x => x.Artists).HasColumnName("artists").HasColumnType("jsonb");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
+
+            e.HasIndex(x => x.SpotifyId).IsUnique().HasDatabaseName("ix_albums_spotify_id");
+        });
+
+        mb.Entity<Track>(e =>
+        {
+            e.ToTable("tracks");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.SpotifyId).HasColumnName("spotify_id").HasMaxLength(64).IsRequired();
+            e.Property(x => x.AlbumId).HasColumnName("album_id");
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(512).IsRequired();
+            e.Property(x => x.DurationMs).HasColumnName("duration_ms");
+            e.Property(x => x.TrackNumber).HasColumnName("track_number");
+            e.Property(x => x.PreviewUrl).HasColumnName("preview_url");
+            e.Property(x => x.Artists).HasColumnName("artists").HasColumnType("jsonb");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
+
+            e.HasIndex(x => x.SpotifyId).IsUnique().HasDatabaseName("ix_tracks_spotify_id");
+            e.HasIndex(x => x.AlbumId).HasDatabaseName("ix_tracks_album_id");
+
+            e.HasOne(x => x.Album)
+                .WithMany(a => a.Tracks)
+                .HasForeignKey(x => x.AlbumId)
+                .HasConstraintName("fk_tracks_albums_album_id")
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        mb.Entity<Review>(e =>
+        {
+            e.ToTable("reviews", t => t.HasCheckConstraint(
+                "ck_reviews_exactly_one_target",
+                "(track_id IS NOT NULL)::int + (album_id IS NOT NULL)::int = 1"));
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.UserId).HasColumnName("user_id");
+            e.Property(x => x.TrackId).HasColumnName("track_id");
+            e.Property(x => x.AlbumId).HasColumnName("album_id");
+            e.Property(x => x.Rating).HasColumnName("rating").HasColumnType("numeric(3,1)");
+            e.Property(x => x.Body).HasColumnName("body").HasMaxLength(140).IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
+            e.Property(x => x.DeletedAt).HasColumnName("deleted_at");
+
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .HasConstraintName("fk_reviews_users_user_id")
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Track)
+                .WithMany()
+                .HasForeignKey(x => x.TrackId)
+                .HasConstraintName("fk_reviews_tracks_track_id")
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Album)
+                .WithMany()
+                .HasForeignKey(x => x.AlbumId)
+                .HasConstraintName("fk_reviews_albums_album_id")
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => new { x.UserId, x.TrackId })
+                .IsUnique()
+                .HasFilter("track_id IS NOT NULL AND deleted_at IS NULL")
+                .HasDatabaseName("ux_reviews_user_track_alive");
+            e.HasIndex(x => new { x.UserId, x.AlbumId })
+                .IsUnique()
+                .HasFilter("album_id IS NOT NULL AND deleted_at IS NULL")
+                .HasDatabaseName("ux_reviews_user_album_alive");
+            e.HasIndex(x => x.TrackId).HasDatabaseName("ix_reviews_track_id");
+            e.HasIndex(x => x.AlbumId).HasDatabaseName("ix_reviews_album_id");
+            e.HasIndex(x => x.CreatedAt).HasDatabaseName("ix_reviews_created_at");
+        });
+
+        mb.Entity<ReviewReaction>(e =>
+        {
+            e.ToTable("review_reactions");
+            e.HasKey(x => new { x.ReviewId, x.UserId });
+            e.Property(x => x.ReviewId).HasColumnName("review_id");
+            e.Property(x => x.UserId).HasColumnName("user_id");
+            e.Property(x => x.Kind).HasColumnName("kind").HasColumnType("smallint");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+
+            e.HasOne(x => x.Review)
+                .WithMany(r => r.Reactions)
+                .HasForeignKey(x => x.ReviewId)
+                .HasConstraintName("fk_review_reactions_reviews_review_id")
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .HasConstraintName("fk_review_reactions_users_user_id")
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => x.UserId).HasDatabaseName("ix_review_reactions_user_id");
         });
     }
 }

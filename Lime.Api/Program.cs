@@ -3,10 +3,14 @@ using Lime.Api.Data;
 using Lime.Api.Features.Auth;
 using Lime.Api.Features.Auth.Models;
 using Lime.Api.Features.Auth.Services;
+using Lime.Api.Features.Catalog;
+using Lime.Api.Features.Reviews;
 using Lime.Api.Features.Spotify;
+using Lime.Api.Features.Users;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,8 +21,13 @@ var dbOptions = builder.Configuration
     .GetSection(DatabaseOptions.SectionName)
     .Get<DatabaseOptions>() ?? new DatabaseOptions();
 
+var dataSourceBuilder = new NpgsqlDataSourceBuilder(dbOptions.BuildConnectionString());
+dataSourceBuilder.EnableDynamicJson();
+var dataSource = dataSourceBuilder.Build();
+builder.Services.AddSingleton(dataSource);
+
 builder.Services.AddDbContext<AppDbContext>(opt =>
-    opt.UseNpgsql(dbOptions.BuildConnectionString()));
+    opt.UseNpgsql(dataSource));
 
 // Auth options
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
@@ -42,6 +51,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton<ISpotifyTokenProvider, SpotifyTokenProvider>();
 builder.Services.AddHttpClient<SpotifyClient>();
 builder.Services.AddScoped<ISpotifyUserTokenService, SpotifyUserTokenService>();
+builder.Services.AddScoped<ICatalogService, CatalogService>();
 
 // JWT auth — token read from cookie
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -105,5 +115,8 @@ app.MapGet("/health/db", async (AppDbContext db) =>
 app.MapAuthEndpoints();
 app.MapSpotifyEndpoints();
 app.MapSpotifyConnectEndpoints();
+app.MapReviewEndpoints();
+app.MapCatalogEndpoints();
+app.MapUserEndpoints();
 
 app.Run();
