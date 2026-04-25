@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     public DbSet<Track> Tracks => Set<Track>();
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<ReviewReaction> ReviewReactions => Set<ReviewReaction>();
+    public DbSet<Follow> Follows => Set<Follow>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -211,6 +212,29 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             e.HasIndex(x => x.UserId).HasDatabaseName("ix_review_reactions_user_id");
+        });
+
+        mb.Entity<Follow>(e =>
+        {
+            e.ToTable("follows", t => t.HasCheckConstraint(
+                "ck_follows_no_self", "follower_id <> followee_id"));
+            e.HasKey(x => new { x.FollowerId, x.FolloweeId });
+            e.Property(x => x.FollowerId).HasColumnName("follower_id");
+            e.Property(x => x.FolloweeId).HasColumnName("followee_id");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+
+            e.HasOne(x => x.Follower)
+                .WithMany()
+                .HasForeignKey(x => x.FollowerId)
+                .HasConstraintName("fk_follows_users_follower_id")
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Followee)
+                .WithMany()
+                .HasForeignKey(x => x.FolloweeId)
+                .HasConstraintName("fk_follows_users_followee_id")
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => x.FolloweeId).HasDatabaseName("ix_follows_followee_id");
         });
     }
 }

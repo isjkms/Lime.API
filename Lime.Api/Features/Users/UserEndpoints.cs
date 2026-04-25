@@ -136,8 +136,11 @@ public static class UserEndpoints
         return Guid.TryParse(sub, out userId);
     }
 
-    private static async Task<IResult> GetUserAsync(Guid id, AppDbContext db, CancellationToken ct)
+    private static async Task<IResult> GetUserAsync(
+        Guid id, HttpContext ctx, AppDbContext db, CancellationToken ct)
     {
+        var viewerId = TryGetUserId(ctx, out var v) ? (Guid?)v : null;
+
         var row = await db.Users.AsNoTracking()
             .Where(u => u.Id == id && u.DeletedAt == null)
             .Select(u => new
@@ -150,6 +153,10 @@ public static class UserEndpoints
                 reviewCount = db.Reviews.Count(r => r.UserId == u.Id && r.DeletedAt == null),
                 likesReceived = db.ReviewReactions.Count(x =>
                     x.Kind == ReactionKind.Like && x.Review!.UserId == u.Id && x.Review.DeletedAt == null),
+                followersCount = db.Follows.Count(f => f.FolloweeId == u.Id),
+                followingCount = db.Follows.Count(f => f.FollowerId == u.Id),
+                isFollowing = viewerId != null && db.Follows.Any(
+                    f => f.FollowerId == viewerId && f.FolloweeId == u.Id),
             })
             .FirstOrDefaultAsync(ct);
         return row is null ? Results.NotFound() : Results.Ok(row);

@@ -5,6 +5,7 @@ using Lime.Api.Features.Auth.Models;
 using Lime.Api.Features.Auth.Services;
 using Lime.Api.Features.Catalog;
 using Lime.Api.Features.Reviews;
+using Lime.Api.Features.Social;
 using Lime.Api.Features.Spotify;
 using Lime.Api.Features.Users;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -119,5 +120,6 @@ app.MapSpotifyConnectEndpoints();
 app.MapReviewEndpoints();
 app.MapCatalogEndpoints();
 app.MapUserEndpoints();
+app.MapSocialEndpoints();
 
 app.Run();

@@ -15,6 +15,7 @@ public static class ReviewEndpoints
         g.MapGet("/", ListAsync);
         g.MapGet("/feed", FeedAsync);
         g.MapGet("/famous-feed", FamousFeedAsync);
+        g.MapGet("/following-feed", FollowingFeedAsync).RequireAuthorization();
         g.MapPost("/", CreateAsync).RequireAuthorization();
         g.MapPatch("/{id:guid}", UpdateAsync).RequireAuthorization();
         g.MapDelete("/{id:guid}", DeleteAsync).RequireAuthorization();
@@ -76,6 +77,22 @@ public static class ReviewEndpoints
             .Take(take);
 
         return await PageProjectAsync(q, GetUserId(ctx), db, ct);
+    }
+
+    private static async Task<IResult> FollowingFeedAsync(
+        int? limit, HttpContext ctx, AppDbContext db, CancellationToken ct)
+    {
+        if (!TryGetUserId(ctx, out var meId)) return Results.Unauthorized();
+        var take = Math.Clamp(limit ?? 10, 1, 50);
+
+        var followingIds = db.Follows.Where(f => f.FollowerId == meId).Select(f => f.FolloweeId);
+
+        var q = db.Reviews.AsNoTracking()
+            .Where(r => r.DeletedAt == null && followingIds.Contains(r.UserId))
+            .OrderByDescending(r => r.CreatedAt)
+            .Take(take);
+
+        return await PageProjectAsync(q, meId, db, ct);
     }
 
     private static async Task<IResult> PageProjectAsync(
