@@ -140,6 +140,11 @@ public static class AuthEndpoints
                 name = u.DisplayName,
                 avatarUrl = u.AvatarUrl,
                 bio = u.Bio,
+                createdAt = u.CreatedAt,
+                providers = u.OAuthAccounts
+                    .OrderBy(a => a.LinkedAt)
+                    .Select(a => a.Provider)
+                    .ToList(),
             })
             .FirstOrDefaultAsync(ct);
 

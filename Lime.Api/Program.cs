@@ -102,6 +102,7 @@ else
 {
     app.UseHttpsRedirection();
 }
+app.UseStaticFiles();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();

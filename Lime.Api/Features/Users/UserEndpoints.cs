@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Lime.Api.Data;
 using Lime.Api.Models;
 using Microsoft.AspNetCore.Http;
@@ -11,7 +12,128 @@ public static class UserEndpoints
     {
         app.MapGet("/users/{id:guid}", GetUserAsync);
         app.MapGet("/users/leaderboard", LeaderboardAsync);
+        app.MapPatch("/users/me", UpdateMeAsync).RequireAuthorization();
+        app.MapDelete("/users/me", DeleteMeAsync).RequireAuthorization();
+        app.MapPost("/users/me/avatar", UploadAvatarAsync)
+            .RequireAuthorization()
+            .DisableAntiforgery();
         return app;
+    }
+
+    private static readonly Dictionary<string, string> AvatarMime = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["image/png"] = ".png",
+        ["image/jpeg"] = ".jpg",
+        ["image/webp"] = ".webp",
+        ["image/gif"] = ".gif",
+    };
+
+    private static async Task<IResult> UploadAvatarAsync(
+        HttpContext ctx, IFormFile? file, AppDbContext db,
+        IWebHostEnvironment env, CancellationToken ct)
+    {
+        if (!TryGetUserId(ctx, out var userId)) return Results.Unauthorized();
+        if (file is null || file.Length == 0)
+            return Results.BadRequest(new { error = "missing_file" });
+        if (file.Length > 2 * 1024 * 1024)
+            return Results.BadRequest(new { error = "file_too_large" });
+        if (!AvatarMime.TryGetValue(file.ContentType, out var ext))
+            return Results.BadRequest(new { error = "invalid_content_type" });
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId && u.DeletedAt == null, ct);
+        if (user is null) return Results.Unauthorized();
+
+        var rootPath = env.WebRootPath;
+        if (string.IsNullOrEmpty(rootPath))
+        {
+            rootPath = Path.Combine(env.ContentRootPath, "wwwroot");
+        }
+        var dir = Path.Combine(rootPath, "uploads", "avatars");
+        Directory.CreateDirectory(dir);
+
+        var fileName = $"{userId:N}-{DateTime.UtcNow:yyyyMMddHHmmssfff}{ext}";
+        var fullPath = Path.Combine(dir, fileName);
+        await using (var stream = File.Create(fullPath))
+        {
+            await file.CopyToAsync(stream, ct);
+        }
+
+        var req = ctx.Request;
+        var url = $"{req.Scheme}://{req.Host}/uploads/avatars/{fileName}";
+
+        user.AvatarUrl = url;
+        user.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        return Results.Ok(new { url });
+    }
+
+    public record UpdateMeRequest(string? DisplayName, string? AvatarUrl, string? Bio);
+
+    private static async Task<IResult> UpdateMeAsync(
+        UpdateMeRequest req, HttpContext ctx, AppDbContext db, CancellationToken ct)
+    {
+        if (!TryGetUserId(ctx, out var userId)) return Results.Unauthorized();
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId && u.DeletedAt == null, ct);
+        if (user is null) return Results.Unauthorized();
+
+        if (req.DisplayName is string dn)
+        {
+            var trimmed = dn.Trim();
+            if (trimmed.Length < 1 || trimmed.Length > 32)
+                return Results.BadRequest(new { error = "invalid_display_name" });
+            user.DisplayName = trimmed;
+        }
+        if (req.AvatarUrl is string au)
+        {
+            var trimmed = au.Trim();
+            if (trimmed.Length == 0) user.AvatarUrl = null;
+            else
+            {
+                if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)
+                    || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+                    return Results.BadRequest(new { error = "invalid_avatar_url" });
+                user.AvatarUrl = trimmed;
+            }
+        }
+        if (req.Bio is string bio)
+        {
+            var trimmed = bio.Trim();
+            if (trimmed.Length > 200) return Results.BadRequest(new { error = "invalid_bio" });
+            user.Bio = trimmed.Length == 0 ? null : trimmed;
+        }
+        user.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        return Results.Ok(new
+        {
+            id = user.Id,
+            email = user.Email,
+            name = user.DisplayName,
+            avatarUrl = user.AvatarUrl,
+            bio = user.Bio,
+        });
+    }
+
+    private static async Task<IResult> DeleteMeAsync(
+        HttpContext ctx, AppDbContext db, CancellationToken ct)
+    {
+        if (!TryGetUserId(ctx, out var userId)) return Results.Unauthorized();
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId && u.DeletedAt == null, ct);
+        if (user is null) return Results.NoContent();
+
+        user.DeletedAt = DateTime.UtcNow;
+        user.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return Results.NoContent();
+    }
+
+    private static bool TryGetUserId(HttpContext ctx, out Guid userId)
+    {
+        var sub = ctx.User.FindFirst("sub")?.Value
+            ?? ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return Guid.TryParse(sub, out userId);
     }
 
     private static async Task<IResult> GetUserAsync(Guid id, AppDbContext db, CancellationToken ct)
