@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Lime.Api.Data;
 using Lime.Api.Features.Catalog;
+using Lime.Api.Features.Notifications;
 using Lime.Api.Features.Points;
 using Lime.Api.Models;
 using Microsoft.AspNetCore.Http;
@@ -278,7 +279,7 @@ public static class ReviewEndpoints
 
     private static async Task<IResult> ReactAsync(
         Guid id, ReactionRequest req, HttpContext ctx, AppDbContext db,
-        IPointsService points, CancellationToken ct)
+        IPointsService points, INotificationService notifications, CancellationToken ct)
     {
         if (!TryGetUserId(ctx, out var userId)) return Results.Unauthorized();
         var kind = req.Kind switch
@@ -311,22 +312,28 @@ public static class ReviewEndpoints
         }
         await db.SaveChangesAsync(ct);
 
-        // 좋아요 신규/취소에 따른 작성자 포인트 보정
+        // 좋아요 신규/취소에 따른 작성자 포인트·알림 보정
         var wasLike = prevKind == ReactionKind.Like;
         var nowLike = kind.Value == ReactionKind.Like;
         if (!wasLike && nowLike)
+        {
             await points.TryAdjustAsync(review.UserId, PointsConfig.LikeReceivedReward,
                 PointReason.LikeReceived, "review", review.Id, ct);
+            await notifications.NotifyReviewLikedAsync(review.UserId, userId, review.Id, ct);
+        }
         else if (wasLike && !nowLike)
+        {
             await points.TryAdjustAsync(review.UserId, -PointsConfig.LikeReceivedReward,
                 PointReason.LikeRevoked, "review", review.Id, ct);
+            await notifications.RemoveReviewLikedAsync(review.UserId, userId, review.Id, ct);
+        }
 
         return Results.NoContent();
     }
 
     private static async Task<IResult> UnreactAsync(
         Guid id, HttpContext ctx, AppDbContext db, IPointsService points,
-        CancellationToken ct)
+        INotificationService notifications, CancellationToken ct)
     {
         if (!TryGetUserId(ctx, out var userId)) return Results.Unauthorized();
 
@@ -341,8 +348,11 @@ public static class ReviewEndpoints
         await db.SaveChangesAsync(ct);
 
         if (wasLike)
+        {
             await points.TryAdjustAsync(reviewOwnerId, -PointsConfig.LikeReceivedReward,
                 PointReason.LikeRevoked, "review", id, ct);
+            await notifications.RemoveReviewLikedAsync(reviewOwnerId, userId, id, ct);
+        }
 
         return Results.NoContent();
     }

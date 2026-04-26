@@ -4,6 +4,7 @@ using Lime.Api.Features.Auth;
 using Lime.Api.Features.Auth.Models;
 using Lime.Api.Features.Auth.Services;
 using Lime.Api.Features.Catalog;
+using Lime.Api.Features.Notifications;
 using Lime.Api.Features.Points;
 using Lime.Api.Features.Reviews;
 using Lime.Api.Features.Social;
@@ -13,6 +14,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,6 +57,14 @@ builder.Services.AddHttpClient<SpotifyClient>();
 builder.Services.AddScoped<ISpotifyUserTokenService, SpotifyUserTokenService>();
 builder.Services.AddScoped<ICatalogService, CatalogService>();
 builder.Services.AddScoped<IPointsService, PointsService>();
+var redisOptions = builder.Configuration
+    .GetSection(RedisOptions.SectionName)
+    .Get<RedisOptions>() ?? new RedisOptions();
+builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+    ConnectionMultiplexer.Connect(redisOptions.ToConfigurationOptions()));
+builder.Services.AddSingleton<NotificationStream>();
+builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<INotificationService>(sp => sp.GetRequiredService<NotificationService>());
 
 // JWT auth — token read from cookie
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -124,5 +134,6 @@ app.MapCatalogEndpoints();
 app.MapUserEndpoints();
 app.MapSocialEndpoints();
 app.MapPointsEndpoints();
+app.MapNotificationEndpoints();
 
 app.Run();

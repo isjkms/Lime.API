@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Lime.Api.Data;
+using Lime.Api.Features.Notifications;
 using Lime.Api.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -18,7 +19,8 @@ public static class SocialEndpoints
     }
 
     private static async Task<IResult> FollowAsync(
-        Guid id, HttpContext ctx, AppDbContext db, CancellationToken ct)
+        Guid id, HttpContext ctx, AppDbContext db, INotificationService notifications,
+        CancellationToken ct)
     {
         if (!TryGetUserId(ctx, out var meId)) return Results.Unauthorized();
         if (meId == id) return Results.BadRequest(new { error = "self_follow" });
@@ -32,17 +34,20 @@ public static class SocialEndpoints
         {
             db.Follows.Add(new Follow { FollowerId = meId, FolloweeId = id });
             await db.SaveChangesAsync(ct);
+            await notifications.NotifyNewFollowerAsync(id, meId, ct);
         }
         return Results.NoContent();
     }
 
     private static async Task<IResult> UnfollowAsync(
-        Guid id, HttpContext ctx, AppDbContext db, CancellationToken ct)
+        Guid id, HttpContext ctx, AppDbContext db, INotificationService notifications,
+        CancellationToken ct)
     {
         if (!TryGetUserId(ctx, out var meId)) return Results.Unauthorized();
         await db.Follows
             .Where(f => f.FollowerId == meId && f.FolloweeId == id)
             .ExecuteDeleteAsync(ct);
+        await notifications.RemoveNewFollowerAsync(id, meId, ct);
         return Results.NoContent();
     }
 

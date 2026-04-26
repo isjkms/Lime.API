@@ -18,6 +18,7 @@ public class AppDbContext : DbContext
     public DbSet<Follow> Follows => Set<Follow>();
     public DbSet<PointTransaction> PointTransactions => Set<PointTransaction>();
     public DbSet<ReviewRevision> ReviewRevisions => Set<ReviewRevision>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -282,6 +283,36 @@ public class AppDbContext : DbContext
 
             e.HasIndex(x => new { x.ReviewId, x.CreatedAt })
                 .HasDatabaseName("ix_review_revisions_review_created");
+        });
+
+        mb.Entity<Notification>(e =>
+        {
+            e.ToTable("notifications");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.UserId).HasColumnName("user_id");
+            e.Property(x => x.Kind).HasColumnName("kind").HasColumnType("smallint");
+            e.Property(x => x.ActorId).HasColumnName("actor_id");
+            e.Property(x => x.RefType).HasColumnName("ref_type").HasMaxLength(32);
+            e.Property(x => x.RefId).HasColumnName("ref_id");
+            e.Property(x => x.ReadAt).HasColumnName("read_at");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .HasConstraintName("fk_notifications_users_user_id")
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Actor)
+                .WithMany()
+                .HasForeignKey(x => x.ActorId)
+                .HasConstraintName("fk_notifications_users_actor_id")
+                .OnDelete(DeleteBehavior.SetNull);
+
+            e.HasIndex(x => new { x.UserId, x.CreatedAt })
+                .HasDatabaseName("ix_notifications_user_created");
+            e.HasIndex(x => new { x.UserId, x.Kind, x.ActorId, x.RefId })
+                .HasDatabaseName("ix_notifications_dedup");
         });
     }
 }
