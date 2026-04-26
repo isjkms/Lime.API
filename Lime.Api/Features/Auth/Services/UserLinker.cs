@@ -1,4 +1,5 @@
 using Lime.Api.Data;
+using Lime.Api.Features.Points;
 using Lime.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -37,9 +38,17 @@ public class UserLinker : IUserLinker
                 Email = info.Email,
                 DisplayName = !string.IsNullOrWhiteSpace(info.Name) ? info.Name! : "user",
                 AvatarUrl = info.AvatarUrl,
+                Points = PointsConfig.WelcomeBonus,
                 LastLoginAt = DateTime.UtcNow,
             };
             _db.Users.Add(user);
+            _db.PointTransactions.Add(new PointTransaction
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                Delta = PointsConfig.WelcomeBonus,
+                Reason = PointReason.WelcomeBonus,
+            });
         }
         else
         {

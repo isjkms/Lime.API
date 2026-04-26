@@ -10,6 +10,7 @@ public class Review
     public string Body { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public DateTime? EditedAt { get; set; }
     public DateTime? DeletedAt { get; set; }
 
     public User? User { get; set; }

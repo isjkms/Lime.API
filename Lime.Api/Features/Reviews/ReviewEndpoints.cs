@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Lime.Api.Data;
 using Lime.Api.Features.Catalog;
+using Lime.Api.Features.Points;
 using Lime.Api.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -133,12 +134,12 @@ public static class ReviewEndpoints
 
     private static async Task<IResult> CreateAsync(
         CreateReviewRequest req, HttpContext ctx, AppDbContext db, ICatalogService catalog,
-        CancellationToken ct)
+        IPointsService points, CancellationToken ct)
     {
         if (!TryGetUserId(ctx, out var userId)) return Results.Unauthorized();
         if (req.Rating < 0.5m || req.Rating > 10m) return Results.BadRequest(new { error = "invalid_rating" });
         var body = (req.Body ?? "").Trim();
-        if (body.Length == 0 || body.Length > 140) return Results.BadRequest(new { error = "invalid_body" });
+        if (body.Length == 0 || body.Length > 100) return Results.BadRequest(new { error = "invalid_body" });
 
         Guid? trackId = null, albumId = null;
         if (req.Target == "track")
@@ -152,10 +153,36 @@ public static class ReviewEndpoints
             r => r.UserId == userId && r.TrackId == trackId && r.AlbumId == albumId && r.DeletedAt == null, ct);
         if (existing is not null)
         {
-            existing.Rating = req.Rating;
-            existing.Body = body;
-            existing.UpdatedAt = DateTime.UtcNow;
-            await db.SaveChangesAsync(ct);
+            var noChange = existing.Rating == req.Rating && existing.Body == body;
+            if (!noChange)
+            {
+                var oldRating = existing.Rating;
+                var oldBody = existing.Body;
+
+                var withinGrace = (DateTime.UtcNow - existing.CreatedAt) <= PointsConfig.EditDeleteGrace;
+                if (!withinGrace)
+                {
+                    db.ReviewRevisions.Add(new ReviewRevision
+                    {
+                        Id = Guid.NewGuid(),
+                        ReviewId = existing.Id,
+                        Rating = oldRating,
+                        Body = oldBody,
+                    });
+
+                    var paid = await points.TryAdjustAsync(userId, -PointsConfig.ReviewEditCost,
+                        PointReason.ReviewEdited, "review", existing.Id, ct);
+                    if (!paid)
+                        return Results.BadRequest(new { error = "not_enough_points", required = PointsConfig.ReviewEditCost });
+
+                    existing.EditedAt = DateTime.UtcNow;
+                }
+
+                existing.Rating = req.Rating;
+                existing.Body = body;
+                existing.UpdatedAt = DateTime.UtcNow;
+                await db.SaveChangesAsync(ct);
+            }
             return Results.Ok(new { id = existing.Id });
         }
 
@@ -170,16 +197,24 @@ public static class ReviewEndpoints
         };
         db.Reviews.Add(review);
         await db.SaveChangesAsync(ct);
+
+        await points.TryAdjustAsync(userId, PointsConfig.ReviewCreatedReward,
+            PointReason.ReviewCreated, "review", review.Id, ct);
+
         return Results.Created($"/reviews/{review.Id}", new { id = review.Id });
     }
 
     private static async Task<IResult> UpdateAsync(
-        Guid id, UpdateReviewRequest req, HttpContext ctx, AppDbContext db, CancellationToken ct)
+        Guid id, UpdateReviewRequest req, HttpContext ctx, AppDbContext db,
+        IPointsService points, CancellationToken ct)
     {
         if (!TryGetUserId(ctx, out var userId)) return Results.Unauthorized();
         var review = await db.Reviews.FirstOrDefaultAsync(r => r.Id == id && r.DeletedAt == null, ct);
         if (review is null) return Results.NotFound();
         if (review.UserId != userId) return Results.Forbid();
+
+        var oldRating = review.Rating;
+        var oldBody = review.Body;
 
         if (req.Rating is decimal rating)
         {
@@ -189,21 +224,52 @@ public static class ReviewEndpoints
         if (req.Body is string body)
         {
             var trimmed = body.Trim();
-            if (trimmed.Length == 0 || trimmed.Length > 140) return Results.BadRequest(new { error = "invalid_body" });
+            if (trimmed.Length == 0 || trimmed.Length > 100) return Results.BadRequest(new { error = "invalid_body" });
             review.Body = trimmed;
         }
+
+        var withinGrace = (DateTime.UtcNow - review.CreatedAt) <= PointsConfig.EditDeleteGrace;
+        if (!withinGrace)
+        {
+            // 본문 보관 (운영자 도구용) + 포인트 차감 + (수정됨) 라벨
+            db.ReviewRevisions.Add(new ReviewRevision
+            {
+                Id = Guid.NewGuid(),
+                ReviewId = review.Id,
+                Rating = oldRating,
+                Body = oldBody,
+            });
+
+            var paid = await points.TryAdjustAsync(userId, -PointsConfig.ReviewEditCost,
+                PointReason.ReviewEdited, "review", review.Id, ct);
+            if (!paid)
+                return Results.BadRequest(new { error = "not_enough_points", required = PointsConfig.ReviewEditCost });
+
+            review.EditedAt = DateTime.UtcNow;
+        }
+
         review.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
         return Results.NoContent();
     }
 
     private static async Task<IResult> DeleteAsync(
-        Guid id, HttpContext ctx, AppDbContext db, CancellationToken ct)
+        Guid id, HttpContext ctx, AppDbContext db, IPointsService points,
+        CancellationToken ct)
     {
         if (!TryGetUserId(ctx, out var userId)) return Results.Unauthorized();
         var review = await db.Reviews.FirstOrDefaultAsync(r => r.Id == id && r.DeletedAt == null, ct);
         if (review is null) return Results.NotFound();
         if (review.UserId != userId) return Results.Forbid();
+
+        var withinGrace = (DateTime.UtcNow - review.CreatedAt) <= PointsConfig.EditDeleteGrace;
+        if (!withinGrace)
+        {
+            var paid = await points.TryAdjustAsync(userId, -PointsConfig.ReviewDeleteCost,
+                PointReason.ReviewDeleted, "review", review.Id, ct);
+            if (!paid)
+                return Results.BadRequest(new { error = "not_enough_points", required = PointsConfig.ReviewDeleteCost });
+        }
 
         review.DeletedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
@@ -211,7 +277,8 @@ public static class ReviewEndpoints
     }
 
     private static async Task<IResult> ReactAsync(
-        Guid id, ReactionRequest req, HttpContext ctx, AppDbContext db, CancellationToken ct)
+        Guid id, ReactionRequest req, HttpContext ctx, AppDbContext db,
+        IPointsService points, CancellationToken ct)
     {
         if (!TryGetUserId(ctx, out var userId)) return Results.Unauthorized();
         var kind = req.Kind switch
@@ -228,6 +295,7 @@ public static class ReviewEndpoints
 
         var existing = await db.ReviewReactions.FirstOrDefaultAsync(
             x => x.ReviewId == id && x.UserId == userId, ct);
+        var prevKind = existing?.Kind;
         if (existing is null)
         {
             db.ReviewReactions.Add(new ReviewReaction
@@ -242,16 +310,40 @@ public static class ReviewEndpoints
             existing.Kind = kind.Value;
         }
         await db.SaveChangesAsync(ct);
+
+        // 좋아요 신규/취소에 따른 작성자 포인트 보정
+        var wasLike = prevKind == ReactionKind.Like;
+        var nowLike = kind.Value == ReactionKind.Like;
+        if (!wasLike && nowLike)
+            await points.TryAdjustAsync(review.UserId, PointsConfig.LikeReceivedReward,
+                PointReason.LikeReceived, "review", review.Id, ct);
+        else if (wasLike && !nowLike)
+            await points.TryAdjustAsync(review.UserId, -PointsConfig.LikeReceivedReward,
+                PointReason.LikeRevoked, "review", review.Id, ct);
+
         return Results.NoContent();
     }
 
     private static async Task<IResult> UnreactAsync(
-        Guid id, HttpContext ctx, AppDbContext db, CancellationToken ct)
+        Guid id, HttpContext ctx, AppDbContext db, IPointsService points,
+        CancellationToken ct)
     {
         if (!TryGetUserId(ctx, out var userId)) return Results.Unauthorized();
-        await db.ReviewReactions
-            .Where(x => x.ReviewId == id && x.UserId == userId)
-            .ExecuteDeleteAsync(ct);
+
+        var existing = await db.ReviewReactions
+            .Include(x => x.Review)
+            .FirstOrDefaultAsync(x => x.ReviewId == id && x.UserId == userId, ct);
+        if (existing is null) return Results.NoContent();
+
+        var wasLike = existing.Kind == ReactionKind.Like;
+        var reviewOwnerId = existing.Review!.UserId;
+        db.ReviewReactions.Remove(existing);
+        await db.SaveChangesAsync(ct);
+
+        if (wasLike)
+            await points.TryAdjustAsync(reviewOwnerId, -PointsConfig.LikeReceivedReward,
+                PointReason.LikeRevoked, "review", id, ct);
+
         return Results.NoContent();
     }
 
@@ -278,6 +370,7 @@ public static class ReviewEndpoints
                 body = r.Body,
                 createdAt = r.CreatedAt,
                 updatedAt = r.UpdatedAt,
+                edited = r.EditedAt != null,
                 user = new
                 {
                     id = r.User!.Id,

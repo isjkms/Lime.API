@@ -16,6 +16,8 @@ public class AppDbContext : DbContext
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<ReviewReaction> ReviewReactions => Set<ReviewReaction>();
     public DbSet<Follow> Follows => Set<Follow>();
+    public DbSet<PointTransaction> PointTransactions => Set<PointTransaction>();
+    public DbSet<ReviewRevision> ReviewRevisions => Set<ReviewRevision>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -30,6 +32,8 @@ public class AppDbContext : DbContext
             e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(64).IsRequired();
             e.Property(x => x.AvatarUrl).HasColumnName("avatar_url");
             e.Property(x => x.Bio).HasColumnName("bio");
+            e.Property(x => x.Points).HasColumnName("points").HasDefaultValue(0);
+            e.Property(x => x.NicknameChanges).HasColumnName("nickname_changes").HasDefaultValue(0);
             e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
             e.Property(x => x.LastLoginAt).HasColumnName("last_login_at");
@@ -157,9 +161,10 @@ public class AppDbContext : DbContext
             e.Property(x => x.TrackId).HasColumnName("track_id");
             e.Property(x => x.AlbumId).HasColumnName("album_id");
             e.Property(x => x.Rating).HasColumnName("rating").HasColumnType("numeric(3,1)");
-            e.Property(x => x.Body).HasColumnName("body").HasMaxLength(140).IsRequired();
+            e.Property(x => x.Body).HasColumnName("body").HasMaxLength(100).IsRequired();
             e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
+            e.Property(x => x.EditedAt).HasColumnName("edited_at");
             e.Property(x => x.DeletedAt).HasColumnName("deleted_at");
 
             e.HasOne(x => x.User)
@@ -235,6 +240,48 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             e.HasIndex(x => x.FolloweeId).HasDatabaseName("ix_follows_followee_id");
+        });
+
+        mb.Entity<PointTransaction>(e =>
+        {
+            e.ToTable("point_transactions");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.UserId).HasColumnName("user_id");
+            e.Property(x => x.Delta).HasColumnName("delta");
+            e.Property(x => x.Reason).HasColumnName("reason").HasColumnType("smallint");
+            e.Property(x => x.RefType).HasColumnName("ref_type").HasMaxLength(32);
+            e.Property(x => x.RefId).HasColumnName("ref_id");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .HasConstraintName("fk_point_transactions_users_user_id")
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => new { x.UserId, x.CreatedAt })
+                .HasDatabaseName("ix_point_transactions_user_created");
+        });
+
+        mb.Entity<ReviewRevision>(e =>
+        {
+            e.ToTable("review_revisions");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.ReviewId).HasColumnName("review_id");
+            e.Property(x => x.Rating).HasColumnName("rating").HasColumnType("numeric(3,1)");
+            e.Property(x => x.Body).HasColumnName("body").HasMaxLength(100).IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+
+            e.HasOne(x => x.Review)
+                .WithMany()
+                .HasForeignKey(x => x.ReviewId)
+                .HasConstraintName("fk_review_revisions_reviews_review_id")
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => new { x.ReviewId, x.CreatedAt })
+                .HasDatabaseName("ix_review_revisions_review_created");
         });
     }
 }

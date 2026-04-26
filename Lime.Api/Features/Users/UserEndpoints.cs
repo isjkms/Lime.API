@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Lime.Api.Data;
+using Lime.Api.Features.Points;
 using Lime.Api.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -71,7 +72,8 @@ public static class UserEndpoints
     public record UpdateMeRequest(string? DisplayName, string? AvatarUrl, string? Bio);
 
     private static async Task<IResult> UpdateMeAsync(
-        UpdateMeRequest req, HttpContext ctx, AppDbContext db, CancellationToken ct)
+        UpdateMeRequest req, HttpContext ctx, AppDbContext db,
+        IPointsService points, CancellationToken ct)
     {
         if (!TryGetUserId(ctx, out var userId)) return Results.Unauthorized();
 
@@ -83,7 +85,23 @@ public static class UserEndpoints
             var trimmed = dn.Trim();
             if (trimmed.Length < 1 || trimmed.Length > 32)
                 return Results.BadRequest(new { error = "invalid_display_name" });
-            user.DisplayName = trimmed;
+
+            if (trimmed != user.DisplayName)
+            {
+                if (user.NicknameChanges >= 1)
+                {
+                    var paid = await points.TryAdjustAsync(userId, -PointsConfig.NicknameChangeCost,
+                        PointReason.NicknameChange, "user", userId, ct);
+                    if (!paid)
+                        return Results.BadRequest(new
+                        {
+                            error = "not_enough_points",
+                            required = PointsConfig.NicknameChangeCost,
+                        });
+                }
+                user.NicknameChanges += 1;
+                user.DisplayName = trimmed;
+            }
         }
         if (req.AvatarUrl is string au)
         {

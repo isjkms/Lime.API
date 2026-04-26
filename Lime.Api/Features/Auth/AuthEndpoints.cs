@@ -140,6 +140,8 @@ public static class AuthEndpoints
                 name = u.DisplayName,
                 avatarUrl = u.AvatarUrl,
                 bio = u.Bio,
+                points = u.Points,
+                nicknameChanges = u.NicknameChanges,
                 createdAt = u.CreatedAt,
                 providers = u.OAuthAccounts
                     .OrderBy(a => a.LinkedAt)

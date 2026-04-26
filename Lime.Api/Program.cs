@@ -4,6 +4,7 @@ using Lime.Api.Features.Auth;
 using Lime.Api.Features.Auth.Models;
 using Lime.Api.Features.Auth.Services;
 using Lime.Api.Features.Catalog;
+using Lime.Api.Features.Points;
 using Lime.Api.Features.Reviews;
 using Lime.Api.Features.Social;
 using Lime.Api.Features.Spotify;
@@ -53,6 +54,7 @@ builder.Services.AddSingleton<ISpotifyTokenProvider, SpotifyTokenProvider>();
 builder.Services.AddHttpClient<SpotifyClient>();
 builder.Services.AddScoped<ISpotifyUserTokenService, SpotifyUserTokenService>();
 builder.Services.AddScoped<ICatalogService, CatalogService>();
+builder.Services.AddScoped<IPointsService, PointsService>();
 
 // JWT auth — token read from cookie
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -121,5 +123,6 @@ app.MapReviewEndpoints();
 app.MapCatalogEndpoints();
 app.MapUserEndpoints();
 app.MapSocialEndpoints();
+app.MapPointsEndpoints();
 
 app.Run();
