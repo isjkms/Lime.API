@@ -15,6 +15,7 @@ public static class CatalogEndpoints
         g.MapGet("/tracks/{id:guid}", GetTrackAsync);
         g.MapGet("/albums/{id:guid}", GetAlbumAsync);
         g.MapGet("/tracks", ListTracksAsync);
+        g.MapGet("/albums", ListAlbumsAsync);
         g.MapGet("/recent-reviewed", RecentReviewedAsync);
         g.MapGet("/top-rated", TopRatedAsync);
         return app;
@@ -96,6 +97,44 @@ public static class CatalogEndpoints
         return Results.Ok(rows.Select(r => new
         {
             r.id, r.spotifyId, r.name, r.previewUrl, r.albumId, r.coverUrl, r.artists,
+            avg = r.stats?.avg ?? 0,
+            n = r.stats?.count ?? 0,
+        }));
+    }
+
+    private static async Task<IResult> ListAlbumsAsync(
+        string? q, int? limit, AppDbContext db, CancellationToken ct)
+    {
+        var take = Math.Clamp(limit ?? 60, 1, 100);
+        var query = db.Albums.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var pattern = $"%{q.Trim()}%";
+            query = query.Where(a => EF.Functions.ILike(a.Name, pattern));
+        }
+
+        var rows = await query
+            .OrderByDescending(a => a.CreatedAt)
+            .Take(take)
+            .Select(a => new
+            {
+                id = a.Id,
+                spotifyId = a.SpotifyId,
+                name = a.Name,
+                coverUrl = a.CoverUrl,
+                releaseDate = a.ReleaseDate,
+                artists = a.Artists,
+                stats = db.Reviews
+                    .Where(r => r.AlbumId == a.Id && r.DeletedAt == null)
+                    .GroupBy(_ => 1)
+                    .Select(g => new { avg = (double?)g.Average(x => (double)x.Rating), count = g.Count() })
+                    .FirstOrDefault(),
+            })
+            .ToListAsync(ct);
+
+        return Results.Ok(rows.Select(r => new
+        {
+            r.id, r.spotifyId, r.name, r.coverUrl, r.releaseDate, r.artists,
             avg = r.stats?.avg ?? 0,
             n = r.stats?.count ?? 0,
         }));
