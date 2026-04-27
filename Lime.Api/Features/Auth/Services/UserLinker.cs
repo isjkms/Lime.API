@@ -37,7 +37,8 @@ public class UserLinker : IUserLinker
                 Id = Guid.NewGuid(),
                 Email = info.Email,
                 DisplayName = !string.IsNullOrWhiteSpace(info.Name) ? info.Name! : "user",
-                AvatarUrl = info.AvatarUrl,
+                // OAuth 프로바이더의 프로필 사진은 사용하지 않음 — 라임 기본 아바타(seed 기반 단면)로 시작
+                AvatarUrl = null,
                 Points = PointsConfig.WelcomeBonus,
                 LastLoginAt = DateTime.UtcNow,
             };

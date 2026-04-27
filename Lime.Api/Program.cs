@@ -6,9 +6,12 @@ using Lime.Api.Features.Auth.Services;
 using Lime.Api.Features.Catalog;
 using Lime.Api.Features.Notifications;
 using Lime.Api.Features.Points;
+using Amazon.Runtime;
+using Amazon.S3;
 using Lime.Api.Features.Reviews;
 using Lime.Api.Features.Social;
 using Lime.Api.Features.Spotify;
+using Lime.Api.Features.Storage;
 using Lime.Api.Features.Users;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -57,6 +60,32 @@ builder.Services.AddHttpClient<SpotifyClient>();
 builder.Services.AddScoped<ISpotifyUserTokenService, SpotifyUserTokenService>();
 builder.Services.AddScoped<ICatalogService, CatalogService>();
 builder.Services.AddScoped<IPointsService, PointsService>();
+// Avatar storage: S3 호환 (Cloudflare R2 등) 또는 로컬 디스크
+var s3Options = builder.Configuration
+    .GetSection(S3Options.SectionName)
+    .Get<S3Options>() ?? new S3Options();
+builder.Services.AddSingleton(s3Options);
+builder.Services.AddHttpContextAccessor();
+if (s3Options.IsConfigured)
+{
+    builder.Services.AddSingleton<IAmazonS3>(_ =>
+    {
+        var creds = new BasicAWSCredentials(s3Options.AccessKey, s3Options.SecretKey);
+        var cfg = new AmazonS3Config
+        {
+            ServiceURL = s3Options.EndPointUrl,
+            ForcePathStyle = s3Options.UseForcePathStyle,
+            AuthenticationRegion = s3Options.Region,
+        };
+        return new AmazonS3Client(creds, cfg);
+    });
+    builder.Services.AddScoped<IAvatarStorage, S3AvatarStorage>();
+}
+else
+{
+    builder.Services.AddScoped<IAvatarStorage, LocalAvatarStorage>();
+}
+
 var redisOptions = builder.Configuration
     .GetSection(RedisOptions.SectionName)
     .Get<RedisOptions>() ?? new RedisOptions();

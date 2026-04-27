@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Lime.Api.Data;
 using Lime.Api.Features.Points;
+using Lime.Api.Features.Storage;
 using Lime.Api.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -31,7 +32,7 @@ public static class UserEndpoints
 
     private static async Task<IResult> UploadAvatarAsync(
         HttpContext ctx, IFormFile? file, AppDbContext db,
-        IWebHostEnvironment env, CancellationToken ct)
+        IAvatarStorage storage, CancellationToken ct)
     {
         if (!TryGetUserId(ctx, out var userId)) return Results.Unauthorized();
         if (file is null || file.Length == 0)
@@ -44,27 +45,17 @@ public static class UserEndpoints
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId && u.DeletedAt == null, ct);
         if (user is null) return Results.Unauthorized();
 
-        var rootPath = env.WebRootPath;
-        if (string.IsNullOrEmpty(rootPath))
-        {
-            rootPath = Path.Combine(env.ContentRootPath, "wwwroot");
-        }
-        var dir = Path.Combine(rootPath, "uploads", "avatars");
-        Directory.CreateDirectory(dir);
+        var previousUrl = user.AvatarUrl;
 
-        var fileName = $"{userId:N}-{DateTime.UtcNow:yyyyMMddHHmmssfff}{ext}";
-        var fullPath = Path.Combine(dir, fileName);
-        await using (var stream = File.Create(fullPath))
-        {
-            await file.CopyToAsync(stream, ct);
-        }
-
-        var req = ctx.Request;
-        var url = $"{req.Scheme}://{req.Host}/uploads/avatars/{fileName}";
+        await using var stream = file.OpenReadStream();
+        var url = await storage.SaveAsync(userId, stream, file.ContentType, ext, ct);
 
         user.AvatarUrl = url;
         user.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
+
+        // 이전 아바타 정리 (best-effort)
+        await storage.TryDeleteAsync(previousUrl, ct);
 
         return Results.Ok(new { url });
     }
