@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Lime.Api.Data;
+using Lime.Api.Features.Legal;
 using Lime.Api.Features.Points;
 using Lime.Api.Features.Storage;
 using Lime.Api.Models;
@@ -14,10 +15,12 @@ public static class UserEndpoints
     {
         app.MapGet("/users/{id:guid}", GetUserAsync);
         app.MapGet("/users/leaderboard", LeaderboardAsync);
-        app.MapPatch("/users/me", UpdateMeAsync).RequireAuthorization();
+        app.MapPatch("/users/me", UpdateMeAsync).RequireAuthorization().RequireConsent();
+        // 탈퇴는 미동의 사용자도 가능해야 함 (가입 취소 경로) → RequireConsent X
         app.MapDelete("/users/me", DeleteMeAsync).RequireAuthorization();
         app.MapPost("/users/me/avatar", UploadAvatarAsync)
             .RequireAuthorization()
+            .RequireConsent()
             .DisableAntiforgery();
         return app;
     }

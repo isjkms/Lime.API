@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Lime.Api.Data;
 using Lime.Api.Features.Catalog;
+using Lime.Api.Features.Legal;
 using Lime.Api.Features.Notifications;
 using Lime.Api.Features.Points;
 using Lime.Api.Models;
@@ -18,11 +19,11 @@ public static class ReviewEndpoints
         g.MapGet("/feed", FeedAsync);
         g.MapGet("/famous-feed", FamousFeedAsync);
         g.MapGet("/following-feed", FollowingFeedAsync).RequireAuthorization();
-        g.MapPost("/", CreateAsync).RequireAuthorization();
-        g.MapPatch("/{id:guid}", UpdateAsync).RequireAuthorization();
-        g.MapDelete("/{id:guid}", DeleteAsync).RequireAuthorization();
-        g.MapPost("/{id:guid}/reactions", ReactAsync).RequireAuthorization();
-        g.MapDelete("/{id:guid}/reactions", UnreactAsync).RequireAuthorization();
+        g.MapPost("/", CreateAsync).RequireAuthorization().RequireConsent();
+        g.MapPatch("/{id:guid}", UpdateAsync).RequireAuthorization().RequireConsent();
+        g.MapDelete("/{id:guid}", DeleteAsync).RequireAuthorization().RequireConsent();
+        g.MapPost("/{id:guid}/reactions", ReactAsync).RequireAuthorization().RequireConsent();
+        g.MapDelete("/{id:guid}/reactions", UnreactAsync).RequireAuthorization().RequireConsent();
 
         app.MapGet("/users/{userId:guid}/reviews", ListByUserAsync);
         return app;

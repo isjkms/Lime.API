@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using Lime.Api.Data;
 using Lime.Api.Features.Auth.Models;
 using Lime.Api.Features.Auth.Services;
+using Lime.Api.Features.Legal;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -13,6 +14,26 @@ public static class AuthEndpoints
 {
     private const string StateCookie = "lime_oauth_state";
     private const string ReturnCookie = "lime_oauth_return";
+    /// <summary>Web 미들웨어가 동의 게이트 판단에 쓰는 신호 cookie. "1" = 동의 완료.</summary>
+    public const string ConsentOkCookie = "lime_consent_ok";
+
+    public static void WriteConsentOkCookie(HttpContext ctx, SessionCookieOptions opt)
+    {
+        ctx.Response.Cookies.Append(ConsentOkCookie, "1", new CookieOptions
+        {
+            HttpOnly = false, // Web 미들웨어가 읽어야 하므로 JS 노출은 무관
+            Secure = opt.Secure,
+            SameSite = Enum.TryParse<SameSiteMode>(opt.SameSite, true, out var mode) ? mode : SameSiteMode.Lax,
+            Domain = opt.Domain,
+            Path = "/",
+            Expires = DateTime.UtcNow.AddDays(365),
+        });
+    }
+
+    public static void ClearConsentOkCookie(HttpContext ctx, SessionCookieOptions opt)
+    {
+        ctx.Response.Cookies.Delete(ConsentOkCookie, new CookieOptions { Path = "/", Domain = opt.Domain });
+    }
 
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
@@ -67,6 +88,7 @@ public static class AuthEndpoints
         OAuthProviderRegistry registry,
         IUserLinker linker,
         ISessionService sessions,
+        IConsentService consents,
         IOptions<AuthOptions> opt,
         CancellationToken ct)
     {
@@ -89,6 +111,11 @@ public static class AuthEndpoints
         var tokens = await sessions.IssueAsync(user, ct);
 
         WriteSessionCookies(ctx, tokens, opt.Value.Cookie);
+
+        // 동의 신호 cookie — 동의 완료면 발행, 아니면 명시적으로 회수.
+        var consentOk = await consents.HasAllRequiredAsync(user.Id, ct);
+        if (consentOk) WriteConsentOkCookie(ctx, opt.Value.Cookie);
+        else ClearConsentOkCookie(ctx, opt.Value.Cookie);
 
         var webBase = string.IsNullOrWhiteSpace(opt.Value.WebBaseUrl) ? "/" : opt.Value.WebBaseUrl.TrimEnd('/');
         var target = returnTo.StartsWith("/") ? webBase + returnTo : returnTo;
@@ -122,14 +149,18 @@ public static class AuthEndpoints
             await sessions.RevokeAsync(refresh, ct);
 
         ClearSessionCookies(ctx, opt.Value.Cookie);
+        ClearConsentOkCookie(ctx, opt.Value.Cookie);
         return Results.NoContent();
     }
 
-    private static async Task<IResult> MeAsync(HttpContext ctx, AppDbContext db, CancellationToken ct)
+    private static async Task<IResult> MeAsync(
+        HttpContext ctx, AppDbContext db, IConsentService consents, CancellationToken ct)
     {
         var sub = ctx.User.FindFirst("sub")?.Value
             ?? ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!Guid.TryParse(sub, out var userId)) return Results.Unauthorized();
+
+        var consentOk = await consents.HasAllRequiredAsync(userId, ct);
 
         var user = await db.Users.AsNoTracking()
             .Where(u => u.Id == userId && u.DeletedAt == null)
@@ -150,7 +181,13 @@ public static class AuthEndpoints
             })
             .FirstOrDefaultAsync(ct);
 
-        return user is null ? Results.Unauthorized() : Results.Ok(user);
+        if (user is null) return Results.Unauthorized();
+        return Results.Ok(new
+        {
+            user.id, user.email, user.name, user.avatarUrl, user.bio,
+            user.points, user.nicknameChanges, user.createdAt, user.providers,
+            consentRequired = !consentOk,
+        });
     }
 
     private static void WriteSessionCookies(HttpContext ctx, IssuedTokens tokens, SessionCookieOptions opt)

@@ -4,6 +4,7 @@ using Lime.Api.Features.Auth;
 using Lime.Api.Features.Auth.Models;
 using Lime.Api.Features.Auth.Services;
 using Lime.Api.Features.Catalog;
+using Lime.Api.Features.Legal;
 using Lime.Api.Features.Notifications;
 using Lime.Api.Features.Points;
 using Amazon.Runtime;
@@ -60,6 +61,7 @@ builder.Services.AddHttpClient<SpotifyClient>();
 builder.Services.AddScoped<ISpotifyUserTokenService, SpotifyUserTokenService>();
 builder.Services.AddScoped<ICatalogService, CatalogService>();
 builder.Services.AddScoped<IPointsService, PointsService>();
+builder.Services.AddScoped<IConsentService, ConsentService>();
 // Avatar storage: S3 호환 (Cloudflare R2 등) 또는 로컬 디스크
 var s3Options = builder.Configuration
     .GetSection(S3Options.SectionName)
@@ -164,5 +166,6 @@ app.MapUserEndpoints();
 app.MapSocialEndpoints();
 app.MapPointsEndpoints();
 app.MapNotificationEndpoints();
+app.MapLegalEndpoints();
 
 app.Run();

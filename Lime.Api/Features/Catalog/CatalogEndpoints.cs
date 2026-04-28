@@ -23,6 +23,10 @@ public static class CatalogEndpoints
 
     public record EnsureRequest(string SpotifyId);
 
+    private record RecentMixedRow(
+        string Kind, Guid Id, string SpotifyId, string Title,
+        List<Lime.Api.Models.ArtistRef> Artists, string? CoverUrl, DateTime LastReviewAt);
+
     private static async Task<IResult> EnsureTrackAsync(
         EnsureRequest req, ICatalogService catalog, AppDbContext db, CancellationToken ct)
     {
@@ -144,6 +148,38 @@ public static class CatalogEndpoints
         string? target, int? limit, AppDbContext db, CancellationToken ct)
     {
         var take = Math.Clamp(limit ?? 8, 1, 50);
+
+        if (target == "mixed" || string.IsNullOrEmpty(target))
+        {
+            // 트랙·앨범 통합. 각 대상의 마지막 평가 시각으로 정렬.
+            var tracks = await db.Reviews.AsNoTracking()
+                .Where(r => r.DeletedAt == null && r.TrackId != null)
+                .GroupBy(r => r.TrackId!.Value)
+                .Select(g => new { id = g.Key, lastAt = g.Max(x => x.CreatedAt) })
+                .OrderByDescending(g => g.lastAt)
+                .Take(take)
+                .Join(db.Tracks, g => g.id, t => t.Id, (g, t) => new RecentMixedRow(
+                    "track", t.Id, t.SpotifyId, t.Name, t.Artists,
+                    t.Album != null ? t.Album.CoverUrl : null, g.lastAt))
+                .ToListAsync(ct);
+
+            var albums = await db.Reviews.AsNoTracking()
+                .Where(r => r.DeletedAt == null && r.AlbumId != null)
+                .GroupBy(r => r.AlbumId!.Value)
+                .Select(g => new { id = g.Key, lastAt = g.Max(x => x.CreatedAt) })
+                .OrderByDescending(g => g.lastAt)
+                .Take(take)
+                .Join(db.Albums, g => g.id, a => a.Id, (g, a) => new RecentMixedRow(
+                    "album", a.Id, a.SpotifyId, a.Name, a.Artists, a.CoverUrl, g.lastAt))
+                .ToListAsync(ct);
+
+            var merged = tracks.Concat(albums)
+                .OrderByDescending(x => x.LastReviewAt)
+                .Take(take)
+                .ToList();
+            return Results.Ok(merged);
+        }
+
         if (target == "track")
         {
             var rows = await db.Reviews.AsNoTracking()

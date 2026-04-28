@@ -19,6 +19,7 @@ public class AppDbContext : DbContext
     public DbSet<PointTransaction> PointTransactions => Set<PointTransaction>();
     public DbSet<ReviewRevision> ReviewRevisions => Set<ReviewRevision>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<UserConsent> UserConsents => Set<UserConsent>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -313,6 +314,28 @@ public class AppDbContext : DbContext
                 .HasDatabaseName("ix_notifications_user_created");
             e.HasIndex(x => new { x.UserId, x.Kind, x.ActorId, x.RefId })
                 .HasDatabaseName("ix_notifications_dedup");
+        });
+
+        mb.Entity<UserConsent>(e =>
+        {
+            e.ToTable("user_consents");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.UserId).HasColumnName("user_id");
+            e.Property(x => x.DocKind).HasColumnName("doc_kind").HasColumnType("smallint");
+            e.Property(x => x.DocVersion).HasColumnName("doc_version").HasMaxLength(32).IsRequired();
+            e.Property(x => x.AgreedAt).HasColumnName("agreed_at").HasDefaultValueSql("now()");
+            e.Property(x => x.IpHash).HasColumnName("ip_hash").HasMaxLength(64);
+            e.Property(x => x.UserAgent).HasColumnName("user_agent").HasMaxLength(255);
+
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .HasConstraintName("fk_user_consents_users_user_id")
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => new { x.UserId, x.DocKind, x.DocVersion })
+                .HasDatabaseName("ix_user_consents_user_doc_version");
         });
     }
 }

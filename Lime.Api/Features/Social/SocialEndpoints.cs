@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Lime.Api.Data;
+using Lime.Api.Features.Legal;
 using Lime.Api.Features.Notifications;
 using Lime.Api.Models;
 using Microsoft.AspNetCore.Http;
@@ -11,8 +12,8 @@ public static class SocialEndpoints
 {
     public static IEndpointRouteBuilder MapSocialEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/users/{id:guid}/follow", FollowAsync).RequireAuthorization();
-        app.MapDelete("/users/{id:guid}/follow", UnfollowAsync).RequireAuthorization();
+        app.MapPost("/users/{id:guid}/follow", FollowAsync).RequireAuthorization().RequireConsent();
+        app.MapDelete("/users/{id:guid}/follow", UnfollowAsync).RequireAuthorization().RequireConsent();
         app.MapGet("/users/{id:guid}/followers", FollowersAsync);
         app.MapGet("/users/{id:guid}/following", FollowingAsync);
         return app;
