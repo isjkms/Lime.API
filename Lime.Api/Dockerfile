@@ -7,8 +7,6 @@ WORKDIR /src
 
 # 의존성 캐시 우선 — csproj만 먼저 복원
 COPY Lime.Api/Lime.Api.csproj ./Lime.Api/
-COPY Lime.Shared/Lime.Shared.csproj ./Lime.Shared/
-COPY Api.sln ./
 RUN dotnet restore Lime.Api/Lime.Api.csproj
 
 # 본 빌드
