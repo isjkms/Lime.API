@@ -9,7 +9,7 @@
 # 만약 챌린지 실패하면 옵션 B로 전환:
 #   tls /etc/caddy/cert.pem /etc/caddy/key.pem
 
-api.lime.oouya.xyz {
+api-lime.oouya.xyz {
 	encode gzip zstd
 
 	# 실제 클라이언트 IP를 얻기 위해 Cloudflare 헤더 신뢰
