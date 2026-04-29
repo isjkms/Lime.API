@@ -65,6 +65,11 @@ services:
       S3__Region: ${S3_REGION:-auto}
       S3__ForcePathStyle: ${S3_FORCE_PATH_STYLE:-true}
     expose: ["8080"]
+    volumes:
+      # ASP.NET Core DataProtection 키 영속화 — 재배포해도 쿠키·세션 유지
+      - api_dp_keys:/app/.aspnet/DataProtection-Keys
+      # 아바타 로컬 폴백 디렉토리 (S3 사용 시 안 쓰임이지만 안전망)
+      - api_uploads:/app/wwwroot/uploads
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health/db"]
       interval: 30s
@@ -95,3 +100,5 @@ networks:
 volumes:
   caddy_data:
   caddy_config:
+  api_dp_keys:
+  api_uploads:
