@@ -15,6 +15,7 @@ using Lime.Api.Features.Spotify;
 using Lime.Api.Features.Storage;
 using Lime.Api.Features.Users;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
@@ -138,13 +139,28 @@ builder.Services.AddCors(o =>
 
 var app = builder.Build();
 
+// 운영: 프로덕션 환경이면 EF 마이그레이션 자동 적용
+if (!app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 else
 {
-    app.UseHttpsRedirection();
+    // Caddy/Cloudflare 뒤에서 X-Forwarded-* 신뢰
+    var fwd = new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+    };
+    fwd.KnownIPNetworks.Clear();
+    fwd.KnownProxies.Clear();
+    app.UseForwardedHeaders(fwd);
 }
 app.UseStaticFiles();
 app.UseCors();

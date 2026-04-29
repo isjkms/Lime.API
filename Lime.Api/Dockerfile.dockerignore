@@ -1,0 +1,17 @@
+**/bin
+**/obj
+**/.vs
+**/.vscode
+**/.idea
+**/*.user
+**/.DS_Store
+**/.git
+**/.gitignore
+**/Dockerfile*
+**/docker-compose*
+**/.env
+**/.env.*
+**/wwwroot/uploads
+**/node_modules
+**/Migrations/*.Designer.cs
+.vs/

@@ -1,0 +1,36 @@
+# Caddy 자동 HTTPS — Cloudflare 프록시(Full Strict) 뒤에서 동작.
+# Cloudflare가 클라이언트→CF SSL을 종료하고, CF→origin 연결을 위해 origin이 자체 인증서 보유.
+#
+# 옵션 A) Let's Encrypt 자동 발급 — 80 포트 Cloudflare가 거치므로 HTTP-01 챌린지가 통과 안 될 수 있음.
+#         해결: DNS-01 (Cloudflare API 토큰 필요) 또는 Cloudflare Origin Certificate 사용.
+# 옵션 B) Cloudflare Origin Certificate (15년 유효) 발급 후 직접 마운트 — 가장 단순.
+#
+# 아래는 옵션 A 자동 발급 + tls 디렉티브 기본값. CF Full Strict 모드 가정.
+# 만약 챌린지 실패하면 옵션 B로 전환:
+#   tls /etc/caddy/cert.pem /etc/caddy/key.pem
+
+api.lime.oouya.xyz {
+	encode gzip zstd
+
+	# 실제 클라이언트 IP를 얻기 위해 Cloudflare 헤더 신뢰
+	@cf header CF-Connecting-IP *
+	header @cf X-Real-IP {http.request.header.CF-Connecting-IP}
+
+	# SSE 엔드포인트는 버퍼링 방지
+	@sse path /notifications/stream
+	reverse_proxy @sse api:8080 {
+		flush_interval -1
+		transport http {
+			read_timeout 1h
+		}
+	}
+
+	reverse_proxy api:8080 {
+		header_up X-Forwarded-For {http.request.header.CF-Connecting-IP}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
