@@ -13,5 +13,4 @@
 **/.env.*
 **/wwwroot/uploads
 **/node_modules
-**/Migrations/*.Designer.cs
 .vs/
