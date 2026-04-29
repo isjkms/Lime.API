@@ -71,7 +71,7 @@ services:
       # 아바타 로컬 폴백 디렉토리 (S3 사용 시 안 쓰임이지만 안전망)
       - api_uploads:/app/wwwroot/uploads
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health/db"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health/db"]
       interval: 30s
       timeout: 5s
       retries: 3

@@ -21,8 +21,11 @@ RUN dotnet publish Lime.Api/Lime.Api.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# 비루트 유저로 실행
-RUN groupadd --system --gid 1001 lime \
+# 헬스체크용 curl + 비루트 유저
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/* \
+ && groupadd --system --gid 1001 lime \
  && useradd  --system --uid 1001 --gid lime --shell /usr/sbin/nologin lime
 
 # 영속 디렉토리 미리 생성 + 소유권 — named volume이 첫 마운트 시 권한 상속
@@ -42,6 +45,6 @@ ENV ASPNETCORE_URLS=http://+:8080 \
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD wget -qO- http://localhost:8080/health/db || exit 1
+  CMD curl -fsS http://localhost:8080/health/db || exit 1
 
 ENTRYPOINT ["dotnet", "Lime.Api.dll"]
