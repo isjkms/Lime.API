@@ -25,8 +25,9 @@ WORKDIR /app
 RUN groupadd --system --gid 1001 lime \
  && useradd  --system --uid 1001 --gid lime --shell /usr/sbin/nologin lime
 
-# 업로드 디렉토리 (S3 미사용 시 폴백 경로)
-RUN mkdir -p /app/wwwroot/uploads/avatars && chown -R lime:lime /app
+# 영속 디렉토리 미리 생성 + 소유권 — named volume이 첫 마운트 시 권한 상속
+RUN mkdir -p /app/wwwroot/uploads/avatars /app/.aspnet/DataProtection-Keys \
+ && chown -R lime:lime /app
 
 COPY --from=build --chown=lime:lime /app/publish ./
 
