@@ -1,7 +1,8 @@
 using System.Text.Json.Nodes;
-using Lime.Api.Data;
+using Lime.Data;
+using Lime.Data.Models;
 using Lime.Api.Features.Spotify;
-using Lime.Api.Models;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace Lime.Api.Features.Catalog;

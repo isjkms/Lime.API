@@ -1,6 +1,6 @@
-using Lime.Api.Data;
+using Lime.Data;
+using Lime.Data.Models;
 using Lime.Api.Features.Points;
-using Lime.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Lime.Api.Features.Auth.Services;

@@ -1,6 +1,6 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
-using Lime.Api.Data;
+using Lime.Data;
 using Lime.Api.Features.Auth.Models;
 using Lime.Api.Features.Auth.Services;
 using Lime.Api.Features.Legal;

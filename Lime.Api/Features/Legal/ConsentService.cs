@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
-using Lime.Api.Data;
-using Lime.Api.Models;
+using Lime.Data;
+using Lime.Data.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Lime.Api.Features.Legal;

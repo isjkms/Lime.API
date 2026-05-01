@@ -1,6 +1,5 @@
 using System.Security.Claims;
-using Lime.Api.Data;
-using Microsoft.AspNetCore.Http;
+using Lime.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace Lime.Api.Features.Points;

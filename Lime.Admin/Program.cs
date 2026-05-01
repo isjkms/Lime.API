@@ -1,8 +1,29 @@
+using System.Text;
+using Lime.Data;
+using Lime.Admin.Data;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+// Configure database options
+var dbOptions = builder.Configuration
+    .GetSection(DatabaseOptions.SectionName)
+    .Get<DatabaseOptions>() ?? new DatabaseOptions();
+
+var dataSourceBuilder = new NpgsqlDataSourceBuilder(dbOptions.BuildConnectionString());
+dataSourceBuilder.EnableDynamicJson();
+var dataSource = dataSourceBuilder.Build();
+builder.Services.AddSingleton(dataSource);
+
+builder.Services.AddDbContext<AdminDbContext>(opt =>
+    opt.UseNpgsql(dataSource, npgsql =>
+        npgsql.MigrationsHistoryTable("__EFMigrationsHistory_Admin")));
 
 var app = builder.Build();
 

@@ -1,8 +1,8 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
-using Lime.Api.Data;
-using Lime.Api.Models;
+using Lime.Data;
+using Lime.Data.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 

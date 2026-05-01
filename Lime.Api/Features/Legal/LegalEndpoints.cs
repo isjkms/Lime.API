@@ -1,9 +1,8 @@
 using System.Security.Claims;
-using Lime.Api.Data;
+using Lime.Data;
+using Lime.Data.Models;
 using Lime.Api.Features.Auth;
 using Lime.Api.Features.Auth.Models;
-using Lime.Api.Models;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 

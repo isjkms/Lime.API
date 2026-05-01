@@ -1,5 +1,5 @@
 using System.Text;
-using Lime.Api.Data;
+using Lime.Data;
 using Lime.Api.Features.Auth;
 using Lime.Api.Features.Auth.Models;
 using Lime.Api.Features.Auth.Services;

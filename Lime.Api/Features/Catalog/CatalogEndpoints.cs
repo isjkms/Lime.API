@@ -1,6 +1,4 @@
-using Lime.Api.Data;
-using Lime.Api.Models;
-using Microsoft.AspNetCore.Http;
+using Lime.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace Lime.Api.Features.Catalog;
@@ -25,7 +23,7 @@ public static class CatalogEndpoints
 
     private record RecentMixedRow(
         string Kind, Guid Id, string SpotifyId, string Title,
-        List<Lime.Api.Models.ArtistRef> Artists, string? CoverUrl, DateTime LastReviewAt);
+        List<Lime.Data.Models.ArtistRef> Artists, string? CoverUrl, DateTime LastReviewAt);
 
     private static async Task<IResult> EnsureTrackAsync(
         EnsureRequest req, ICatalogService catalog, AppDbContext db, CancellationToken ct)

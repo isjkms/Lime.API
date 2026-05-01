@@ -1,8 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
-using Lime.Api.Data;
-using Lime.Api.Models;
-using Microsoft.AspNetCore.Http;
+using Lime.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace Lime.Api.Features.Notifications;

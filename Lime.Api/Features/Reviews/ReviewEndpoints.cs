@@ -1,10 +1,10 @@
 using System.Security.Claims;
-using Lime.Api.Data;
+using Lime.Data;
+using Lime.Data.Models;
 using Lime.Api.Features.Catalog;
 using Lime.Api.Features.Legal;
 using Lime.Api.Features.Notifications;
 using Lime.Api.Features.Points;
-using Lime.Api.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 

@@ -1,4 +1,4 @@
-using Lime.Api.Models;
+using Lime.Data.Models;
 
 namespace Lime.Api.Features.Legal;
 
