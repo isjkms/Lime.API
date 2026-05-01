@@ -8,7 +8,6 @@ public class AdminDbContext : DbContext
     public AdminDbContext(DbContextOptions<AdminDbContext> options) : base(options) { }
 
     public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
-    public DbSet<AdminSession> AdminSessions => Set<AdminSession>();
     public DbSet<AdminAuditLog> AdminAuditLogs => Set<AdminAuditLog>();
 
     protected override void OnModelCreating(ModelBuilder mb)
@@ -37,30 +36,6 @@ public class AdminDbContext : DbContext
 
             e.HasIndex(x => x.Email).IsUnique().HasDatabaseName("ux_admin_users_email");
             e.HasIndex(x => x.Role).HasDatabaseName("ix_admin_users_role");
-        });
-
-        mb.Entity<AdminSession>(e =>
-        {
-            e.ToTable("admin_sessions");
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Id).HasColumnName("id");
-            e.Property(x => x.AdminUserId).HasColumnName("admin_user_id");
-            e.Property(x => x.SessionTokenHash).HasColumnName("session_token_hash").HasMaxLength(128).IsRequired();
-            e.Property(x => x.ExpiresAt).HasColumnName("expires_at");
-            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
-            e.Property(x => x.RevokedAt).HasColumnName("revoked_at");
-            e.Property(x => x.IpAddress).HasColumnName("ip_address").HasMaxLength(64);
-            e.Property(x => x.UserAgent).HasColumnName("user_agent").HasMaxLength(512);
-
-            e.HasOne(x => x.AdminUser)
-                .WithMany(x => x.Sessions)
-                .HasForeignKey(x => x.AdminUserId)
-                .HasConstraintName("fk_admin_sessions_admin_users_admin_user_id")
-                .OnDelete(DeleteBehavior.Cascade);
-
-            e.HasIndex(x => x.SessionTokenHash).IsUnique().HasDatabaseName("ux_admin_sessions_session_token_hash");
-            e.HasIndex(x => x.AdminUserId).HasDatabaseName("ix_admin_sessions_admin_user_id");
-            e.HasIndex(x => x.ExpiresAt).HasDatabaseName("ix_admin_sessions_expires_at");
         });
 
         mb.Entity<AdminAuditLog>(e =>

@@ -57,30 +57,6 @@ namespace Lime.Admin.Migrations.Admin
                         onDelete: ReferentialAction.Restrict);
                 });
 
-            migrationBuilder.CreateTable(
-                name: "admin_sessions",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    admin_user_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    session_token_hash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    expires_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    revoked_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    ip_address = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    user_agent = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_admin_sessions", x => x.id);
-                    table.ForeignKey(
-                        name: "fk_admin_sessions_admin_users_admin_user_id",
-                        column: x => x.admin_user_id,
-                        principalTable: "admin_users",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
             migrationBuilder.CreateIndex(
                 name: "ix_admin_audit_logs_action",
                 table: "admin_audit_logs",
@@ -102,22 +78,6 @@ namespace Lime.Admin.Migrations.Admin
                 columns: new[] { "target_type", "target_id" });
 
             migrationBuilder.CreateIndex(
-                name: "ix_admin_sessions_admin_user_id",
-                table: "admin_sessions",
-                column: "admin_user_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_admin_sessions_expires_at",
-                table: "admin_sessions",
-                column: "expires_at");
-
-            migrationBuilder.CreateIndex(
-                name: "ux_admin_sessions_session_token_hash",
-                table: "admin_sessions",
-                column: "session_token_hash",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
                 name: "ix_admin_users_role",
                 table: "admin_users",
                 column: "role");
@@ -134,9 +94,6 @@ namespace Lime.Admin.Migrations.Admin
         {
             migrationBuilder.DropTable(
                 name: "admin_audit_logs");
-
-            migrationBuilder.DropTable(
-                name: "admin_sessions");
 
             migrationBuilder.DropTable(
                 name: "admin_users");

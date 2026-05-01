@@ -86,62 +86,6 @@ namespace Lime.Admin.Migrations.Admin
                     b.ToTable("admin_audit_logs", (string)null);
                 });
 
-            modelBuilder.Entity("Lime.Admin.Models.AdminSession", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("AdminUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("admin_user_id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at");
-
-                    b.Property<string>("IpAddress")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("ip_address");
-
-                    b.Property<DateTime?>("RevokedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("revoked_at");
-
-                    b.Property<string>("SessionTokenHash")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
-                        .HasColumnName("session_token_hash");
-
-                    b.Property<string>("UserAgent")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)")
-                        .HasColumnName("user_agent");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AdminUserId")
-                        .HasDatabaseName("ix_admin_sessions_admin_user_id");
-
-                    b.HasIndex("ExpiresAt")
-                        .HasDatabaseName("ix_admin_sessions_expires_at");
-
-                    b.HasIndex("SessionTokenHash")
-                        .IsUnique()
-                        .HasDatabaseName("ux_admin_sessions_session_token_hash");
-
-                    b.ToTable("admin_sessions", (string)null);
-                });
-
             modelBuilder.Entity("Lime.Admin.Models.AdminUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -229,23 +173,9 @@ namespace Lime.Admin.Migrations.Admin
                     b.Navigation("AdminUser");
                 });
 
-            modelBuilder.Entity("Lime.Admin.Models.AdminSession", b =>
-                {
-                    b.HasOne("Lime.Admin.Models.AdminUser", "AdminUser")
-                        .WithMany("Sessions")
-                        .HasForeignKey("AdminUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_admin_sessions_admin_users_admin_user_id");
-
-                    b.Navigation("AdminUser");
-                });
-
             modelBuilder.Entity("Lime.Admin.Models.AdminUser", b =>
                 {
                     b.Navigation("AuditLogs");
-
-                    b.Navigation("Sessions");
                 });
 #pragma warning restore 612, 618
         }

@@ -1,0 +1,62 @@
+@page "/login"
+
+<PageTitle>Login - Lime Admin</PageTitle>
+
+<div class="min-vh-100 d-flex align-items-center justify-content-center bg-body-tertiary px-3">
+    <main class="card shadow-sm border-0" style="width: 100%; max-width: 420px;">
+        <div class="card-body p-4 p-sm-5">
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <div class="d-flex align-items-center justify-content-center rounded bg-success text-white fw-bold"
+                     style="width: 44px; height: 44px; font-size: 22px;">
+                    L
+                </div>
+                <div>
+                    <h1 class="h4 mb-1 fw-bold">Lime Admin</h1>
+                    <p class="mb-0 text-secondary small">관리자 계정으로 로그인하세요.</p>
+                </div>
+            </div>
+
+            @if (HasError)
+            {
+                <div class="alert alert-danger py-2 small" role="alert">
+                    이메일 또는 비밀번호가 올바르지 않습니다.
+                </div>
+            }
+
+            <form method="post" action="/auth/login">
+                <div class="mb-3">
+                    <label for="email" class="form-label fw-semibold">이메일</label>
+                    <input id="email"
+                           name="email"
+                           type="email"
+                           class="form-control"
+                           autocomplete="username"
+                           placeholder="admin@lime.app"
+                           required />
+                </div>
+
+                <div class="mb-4">
+                    <label for="password" class="form-label fw-semibold">비밀번호</label>
+                    <input id="password"
+                           name="password"
+                           type="password"
+                           class="form-control"
+                           autocomplete="current-password"
+                           placeholder="비밀번호"
+                           required />
+                </div>
+
+                <button type="submit" class="btn btn-success w-100 fw-bold">
+                    로그인
+                </button>
+            </form>
+        </div>
+    </main>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
+
+    private bool HasError => Error == "1";
+}

@@ -1,0 +1,31 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+
+@if (IsLoginPage)
+{
+    @Body
+}
+else
+{
+    <div class="min-vh-100 bg-body-tertiary">
+        <header class="navbar bg-white border-bottom px-3">
+            <a class="navbar-brand fw-bold text-success" href="/">Lime Admin</a>
+            <form method="post" action="/auth/logout" class="m-0">
+                <button type="submit" class="btn btn-outline-secondary btn-sm">로그아웃</button>
+            </form>
+        </header>
+
+        @Body
+    </div>
+}
+
+@code {
+    private bool IsLoginPage
+    {
+        get
+        {
+            var relativePath = Navigation.ToBaseRelativePath(Navigation.Uri);
+            return relativePath.StartsWith("login", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+}

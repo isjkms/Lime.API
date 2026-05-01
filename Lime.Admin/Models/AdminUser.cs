@@ -14,7 +14,6 @@ public class AdminUser
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
-    public ICollection<AdminSession> Sessions { get; set; } = new List<AdminSession>();
     public ICollection<AdminAuditLog> AuditLogs { get; set; } = new List<AdminAuditLog>();
 }
 
